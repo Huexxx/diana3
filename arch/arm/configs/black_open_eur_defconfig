@@ -454,10 +454,10 @@ CONFIG_ALIGNMENT_TRAP=y
 # CONFIG_USE_OF is not set
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="mem=512M init=/init videoout=omap24xxvout omap_vout.video1_numbuffers=6 omap_vout.vid1_static_vrfb_alloc=y vram=16M omapfb.vram=0:8M lpj=2334720 fuelgauge=g muic_state=0 console=ttyO2,115200n8 androidboot.hardware=blackg"
-CONFIG_CMDLINE_FROM_BOOTLOADER=y
+CONFIG_CMDLINE="rs=s mem=512M init=/init videoout=omap24xxvout omap_vout.video1_numbuffers=6 omap_vout.vid1_static_vrfb_alloc=y vram=16M omapfb.vram=0:5M lpj=2334720 fuelgauge=g androidboot.hardware=blackg muic_state=0 thermal_fakemode=0"
+# CONFIG_CMDLINE_FROM_BOOTLOADER is not set
 # CONFIG_CMDLINE_EXTEND is not set
-# CONFIG_CMDLINE_FORCE is not set
+CONFIG_CMDLINE_FORCE=y
 # CONFIG_XIP_KERNEL is not set
 # CONFIG_KEXEC is not set
 # CONFIG_CRASH_DUMP is not set
