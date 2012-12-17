@@ -17,6 +17,8 @@
 # 	- smartreflex-class1p5.o
 # 	- pm44xx.o
 
+plus_sec := $(call as-instr,.arch_extension sec,+sec)
+
 # Common support
 obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer-gp.o pm.o \
 	 common.o gpio.o dma.o wd_timer.o omap_pmic.o dmtimer.o
@@ -46,7 +48,6 @@ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o \
 					   omap-wakeupgen.o
 
-plus_sec := $(call as-instr,.arch_extension sec,+sec)
 AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
 AFLAGS_omap44xx-smc.o			:=-Wa,-march=armv7-a$(plus_sec)
 
@@ -57,7 +58,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= sram34xx.o
 
 AFLAGS_sram242x.o			:=-Wa,-march=armv6
 AFLAGS_sram243x.o			:=-Wa,-march=armv6
-AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
+AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
 
 # Pin multiplexing
 obj-$(CONFIG_SOC_OMAP2420)		+= mux2420.o
