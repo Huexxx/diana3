@@ -24,6 +24,20 @@
 #include <linux/earlysuspend.h>
 #endif
 
+static int max_current = 20;
+module_param(max_current, int, 0600);
+MODULE_PARM_DESC(max_current, "Max current value / 0.2mA.");
+
+static int min_current = 2;
+module_param(min_current, int, 0600);
+MODULE_PARM_DESC(min_current, "Min current value / 0.2mA.");
+
+static int led_timer = 1500;
+module_param(led_timer, int, 0600);
+MODULE_PARM_DESC(led_timer, "Miliseconds at max current.");
+
+static int led_enabled = 1;
+
 #define MODULE_NAME   "led-bd2802"
 
 #ifndef DEBUG
@@ -40,6 +54,8 @@
 #else	/* DEBUG */
 #define DBG(...) 
 #endif
+
+struct i2c_client *bb2802_i2c_client;//2011205 kyungyoon.kim@lge.com lcd resume speed
 
 #define LED_CTL(rgb2en, rgb1en) ((rgb2en) << 4 | ((rgb1en) << 0))
 
@@ -151,10 +167,12 @@ struct bd2802_led {
 //	int 			led_state;
 	int			led_counter;
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend; 
+	struct early_suspend 	early_suspend; 
 #endif
+	int			led_resumed;//2011205 kyungyoon.kim@lge.com lcd resume speed
 };
 
+extern unsigned int system_rev;
 static struct i2c_client *bd2802_i2c_client;
 /*--------------------------------------------------------------*/
 /*	BD2802GU helper functions					*/
@@ -400,20 +418,18 @@ void touchkey_pressed(enum key_leds id)
 	hrtimer_cancel(&led->ledmin_timer);
 
 	if (led->led_state == BD2802_DIMMING) {
-		led->white_current = BD2802_CURRENT_WHITE_MAX;
+		led->white_current = max_current;
 		led->blue_current = BD2802_CURRENT_000;	
 		bd2802_on(led);
 		led->led_state = BD2802_ON;
 	}
-	/* LGE_UPDATE_S 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
-	else if (led->led_state == BD2802_OFF) {
-		led->white_current = BD2802_CURRENT_WHITE_MAX;
+/*	else if (led->led_state == BD2802_OFF) {
+		led->white_current = max_current;
 		led->blue_current = BD2802_CURRENT_000;	
 		led->led_state = BD2802_ON;
 		bd2802_on(led);
 		bd2802_enable(led);
-	}
-	/* LGE_UPDATE_E 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
+	} */
 
 	if (led->key_led != id)
 		bd2802_turn_white(led,led->key_led);
@@ -421,7 +437,7 @@ void touchkey_pressed(enum key_leds id)
 	led->key_led=id;
 	DBG("led->key_led =%d\n",led->key_led);
 
-	led->blue_current = BD2802_CURRENT_BLUE_MAX;
+	led->blue_current = max_current;
 	bd2802_turn_blue(led, led->key_led);
 	bd2802_turn_blue(led, HIDDEN1);
 	bd2802_turn_blue(led, HIDDEN2);
@@ -516,7 +532,7 @@ static enum hrtimer_restart bd2802_timer_func(struct hrtimer *timer)
 	{
 		if (((led->led_counter)%9)==0)
 		//if(((led->key_led==HOME)&&(led->key_direction==BACKWARD))||((led->key_led==BACK)&&(led->key_direction==FORWARD)))
-			hrtimer_start(&led->timer, ktime_set(1,000000000), HRTIMER_MODE_REL); /* 1 sec */
+			hrtimer_start(&led->timer, ktime_set(1, 000000000), HRTIMER_MODE_REL); /* 1 sec */
 		else
 			hrtimer_start(&led->timer, ktime_set(0, 110000000), HRTIMER_MODE_REL); /* 1 sec */
 	}
@@ -527,12 +543,12 @@ static enum hrtimer_restart bd2802_timer_func(struct hrtimer *timer)
 static void bd2802_touchkey_work_func(struct work_struct *work)
 {
 	struct bd2802_led *led = container_of(work, struct bd2802_led, touchkey_work);
-	led->white_current = BD2802_CURRENT_WHITE_MAX;
+	led->white_current = max_current;
 	led->blue_current = BD2802_CURRENT_000;
 	bd2802_turn_white(led,led->key_led);
 	bd2802_turn_blue(led,HIDDEN1);
 	bd2802_turn_blue(led,HIDDEN2);
-	hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
+	hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
 }
 
 static enum hrtimer_restart bd2802_touchkey_timer_func(struct hrtimer *timer)
@@ -550,17 +566,21 @@ static enum hrtimer_restart bd2802_touchkey_timer_func(struct hrtimer *timer)
 static void bd2802_ledmin_work_func(struct work_struct *work)
 {
 	struct bd2802_led *led = container_of(work, struct bd2802_led, ledmin_work);
-	led->white_current = BD2802_CURRENT_WHITE_MIN;
+	led->white_current = min_current;
 	led->blue_current = BD2802_CURRENT_000;
-/* LGE_UPDATE_S 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
-#if 0
+#if 1  
+//    	led->led_state=BD2802_ON;
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.09.09] - Merge from Black_Froyo MR Ver.
+//	bd2802_off(led);
+    	bd2802_turn_white(led, MENU);
+	bd2802_turn_white(led, HOME);
+	bd2802_turn_white(led, BACK);
+	bd2802_turn_white(led, SEARCH);
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.09.09]- Merge from Black_Froyo MR Ver.
+#else  
 	bd2802_on(led);
-	led->led_state = BD2802_DIMMING;
-#else
-	bd2802_off(led);
-	led->led_state = BD2802_OFF;
 #endif
-/* LGE_UPDATE_E 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
+	led->led_state = BD2802_DIMMING;
 }
 
 static enum hrtimer_restart bd2802_ledmin_timer_func(struct hrtimer *timer)
@@ -613,10 +633,8 @@ static ssize_t bd2802_store_blink_enable(struct device *dev,
 //	return count;
 //LGE_UPDATE
 
-    if (led->blink_enable==value)
-    {
+	if (led->blink_enable==value)
 		return count;
-    }
 	
 	if (led->led_state==BD2802_SEQ)
 		return count;
@@ -674,33 +692,33 @@ static ssize_t bd2802_store_led_start(struct device *dev,
 		led->led_state = BD2802_SEQ;
 
 #if defined(BLINK_ON_BOOTING)
-		led->white_current = BD2802_CURRENT_WHITE_MAX;
-	    led->blue_current = BD2802_CURRENT_000;
-	    led->blink_enable = 1;
-	    bd2802_configure(led);
-	    bd2802_on(led);
+		led->white_current = max_current;
+		led->blue_current = BD2802_CURRENT_000;
+		led->blink_enable = 1;
+		bd2802_configure(led);
+		bd2802_on(led);
 #else
-		led->blue_current = BD2802_CURRENT_BLUE_MAX;
+		led->blue_current = max_current;
 		hrtimer_start(&led->timer, ktime_set(0, 800000000), HRTIMER_MODE_REL); /* 0.8 sec */
 #endif	// BLINK_ON_BOOTING
 	}
 	else if (value==0)
 	{
-            #if defined(BLINK_ON_BOOTING)
-	    led->led_state=BD2802_ON;
-	    led->white_current = BD2802_CURRENT_WHITE_MAX;
-	    led->blue_current = BD2802_CURRENT_000;
-	    led->blink_enable=0;
-	    bd2802_sw_reset(led);
-	    bd2802_reset_cancel(led);
-	    bd2802_on(led);
-	    bd2802_enable(led);
-		hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL); //+DEJA
-            #else 
-	    led->led_state=BD2802_SEQ_END;
-	    led->blue_current = BD2802_CURRENT_000;
-	    hrtimer_start(&led->ledmin_timer, ktime_set(10, 0), HRTIMER_MODE_REL);
-            #endif
+#if defined(BLINK_ON_BOOTING)
+		led->led_state=BD2802_ON;
+		led->white_current = max_current;
+		led->blue_current = BD2802_CURRENT_000;
+		led->blink_enable=0;
+		bd2802_sw_reset(led);
+		bd2802_reset_cancel(led);
+		bd2802_on(led);
+		bd2802_enable(led);
+		hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL); //+DEJA
+#else 
+		led->led_state=BD2802_SEQ_END;
+		led->blue_current = BD2802_CURRENT_000;
+		hrtimer_start(&led->ledmin_timer, ktime_set(10, 0), HRTIMER_MODE_REL);
+#endif
 	}
 	else
 	{
@@ -711,6 +729,28 @@ static ssize_t bd2802_store_led_start(struct device *dev,
 	return count;
 }
 
+// LGE_B_DOM_S 20110106 nttaejun.cho@lge.com, Justin LED onoff			
+
+static ssize_t bd2802_show_led_onoff(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct bd2802_led *led = i2c_get_clientdata(to_i2c_client(dev));
+	
+	int r;
+
+	if ((led->led_state == BD2802_ON)||(led->led_state == BD2802_DIMMING))
+	{	
+		r = snprintf(buf, PAGE_SIZE, "%d\n", 1); 
+	}		
+	else 
+	{	
+		r = snprintf(buf, PAGE_SIZE, "%d\n", 0); 
+	}	  
+		  
+	return r;
+}
+
+// LGE_B_DOM_E 20110106 nttaejun.cho@lge.com, Justin LED onoff
 static ssize_t bd2802_store_led_onoff(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -724,29 +764,31 @@ static ssize_t bd2802_store_led_onoff(struct device *dev,
 
 	DBG("value=%d\n",value);
 
-	if ((value==1)&&(led->led_state!=BD2802_ON))
+	if (value==1 || value == 255)
 	{
-		led->led_state = BD2802_ON;
-		led->white_current = BD2802_CURRENT_WHITE_MAX;
-	    led->blue_current = BD2802_CURRENT_000;
+		led->led_state = BD2802_DIMMING; // Huexxx: enable dimmed...
+		led->white_current = min_current; // Huexxx: enable dimmed...
+	    	led->blue_current = BD2802_CURRENT_000;
 		led->blink_enable=0;
 		bd2802_reset_cancel(led);
 		bd2802_on(led);
 		bd2802_enable(led);
+		led_enabled = 1;
 	}
-	else if ((value==0)&&(led->led_state!=BD2802_OFF))
+	else if (value==0)
 	{
 		bd2802_off(led);
 		gpio_set_value(RGB_LED_CNTL, 0);
-	    led->led_state=BD2802_OFF;
+		led->led_state=BD2802_OFF;
+		led_enabled = 0;
 	}
 	else
 	{
 	    if (value > 1)
 	    {
-		return -EINVAL;
-		DBG("Value is not valid\n");
-	}
+			return -EINVAL;
+			DBG("Value is not valid\n");
+		}
 	}
 
 	return count;
@@ -768,7 +810,7 @@ static ssize_t bd2802_store_led_testmode(struct device *dev,
 	if ((value==1)&&(led->led_state!=BD2802_TEST_ON))
 	{
 		led->led_state=BD2802_TEST_ON;
-		led->white_current = BD2802_CURRENT_WHITE_MAX;
+		led->white_current = max_current;
 		led->blue_current = BD2802_CURRENT_000;
 		bd2802_reset_cancel(led);
 		bd2802_on(led);
@@ -821,11 +863,11 @@ static ssize_t bd2802_store_led_sync(struct device *dev,
 		}
 	} else if(value == 0) {
 		if(led->led_state == BD2802_SYNC) {
-			led->white_current = BD2802_CURRENT_WHITE_MAX;
+			led->white_current = max_current;
 			led->blue_current = BD2802_CURRENT_000;
 			bd2802_on(led);
 			led->led_state = BD2802_ON;
-			hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
+			hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
 		}
 	} else {
 		return -EINVAL;
@@ -1028,23 +1070,34 @@ static int bd2802_bl_resume(struct i2c_client *client)
 {
 	struct bd2802_led *led = i2c_get_clientdata(client);
 	DBG("\n");
-	
-	led->led_state = BD2802_ON;
-	led->white_current = BD2802_CURRENT_WHITE_MAX;
-	led->blue_current = BD2802_CURRENT_000;
-/*	if (system_rev >=4) //OVER REV.D
-	{
-		bd2802_write_byte(led->client, BD2812_DCDCDRIVER, 0x00);
-		bd2802_write_byte(led->client, BD2812_PIN_FUNC_SETUP, 0x0F);
-	}*/
-	bd2802_on(led);
-	bd2802_enable(led);
 
-	//hrtimer_start(&led->touchkey_timer, ktime_set(0, 500000000), HRTIMER_MODE_REL); /*5 sec */
-	hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
+	if (led->led_resumed==1)
+		return 0;
+
+	if (unlikely(led_enabled)) {
+		led->led_state = BD2802_DIMMING; // Huexxx: resume dimmed...
+		led->white_current = min_current; // Huexxx: resume dimmed...
+		led->blue_current = BD2802_CURRENT_000;
+/*		if (system_rev >=4) //OVER REV.D
+		{
+			bd2802_write_byte(led->client, BD2812_DCDCDRIVER, 0x00);
+			bd2802_write_byte(led->client, BD2812_PIN_FUNC_SETUP, 0x0F);
+		}*/
+		bd2802_on(led);
+		bd2802_enable(led);
+
+		//hrtimer_start(&led->touchkey_timer, ktime_set(0, 500000000), HRTIMER_MODE_REL); /*5 sec */
+		//hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
+	}
+
+	led->led_resumed=1;
 	return 0;
 }
 
+/* 20110304 seven.kim@lge.com late_resume_lcd [START] */
+static int bd2802_suspend(struct i2c_client *client, pm_message_t mesg);
+static int bd2802_resume(struct i2c_client *client);
+/* 20110304 seven.kim@lge.com late_resume_lcd [END] */
 
 static void bd2802_early_suspend(struct early_suspend *h)
 {
@@ -1059,7 +1112,19 @@ static void bd2802_early_suspend(struct early_suspend *h)
 	hrtimer_cancel(&led->timer);
 	hrtimer_cancel(&led->touchkey_timer);
 	hrtimer_cancel(&led->ledmin_timer);
+
+// dajin.kim@lge.com - add cancel_work_sync [Start]
+	cancel_work_sync(&led->work);
+	cancel_work_sync(&led->touchkey_work);
+	cancel_work_sync(&led->ledmin_work);
+// dajin.kim@lge.com - add cancel_work_sync [End]
+
 	bd2802_bl_suspend(led->client, PMSG_SUSPEND);
+	led->led_resumed=0;
+
+/* 20110304 seven.kim@lge.com late_resume_lcd [START] */
+	bd2802_suspend(led->client, PMSG_SUSPEND);
+/* 20110304 seven.kim@lge.com late_resume_lcd [END] */ 
 }
 
 
@@ -1069,6 +1134,10 @@ static void bd2802_late_resume(struct early_suspend *h)
 	DBG("\n");
 
 	led = container_of(h, struct bd2802_led, early_suspend);
+
+/* 20110304 seven.kim@lge.com late_resume_lcd [START] */
+	bd2802_resume(led->client);
+/* 20110304 seven.kim@lge.com late_resume_lcd [END] */
 
 	if (led->led_state==BD2802_SEQ)
 		return;
@@ -1119,11 +1188,11 @@ static int __devinit bd2802_probe(struct i2c_client *client,
 	led->key_direction= FORWARD;
 	led->led_counter=0;
 #if defined(BLINK_ON_BOOTING)
-	led->white_current = BD2802_CURRENT_WHITE_MAX;
+	led->white_current = max_current;
 	led->blue_current = BD2802_CURRENT_000;
 #else
-	led->white_current = BD2802_CURRENT_WHITE_MAX;
-	led->blue_current = BD2802_CURRENT_BLUE_MAX;
+	led->white_current = max_current;
+	led->blue_current = max_current;
 #endif
 
 	init_rwsem(&led->rwsem);
@@ -1218,6 +1287,7 @@ static int bd2802_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	gpio_set_value(RGB_LED_CNTL, 0);
 	led->led_state = BD2802_OFF;
+	led->led_resumed=0;
 
 	return 0;
 }
@@ -1226,13 +1296,16 @@ static int bd2802_resume(struct i2c_client *client)
 {
 	struct bd2802_led *led = i2c_get_clientdata(client);
 	DBG("\n");
-	led->led_state = BD2802_ON;	
+
+	if (unlikely(led_enabled)) {
+		led->led_state = BD2802_DIMMING; // Huexxx: resume dimmed...	
 /*  TODO : to wakeup from Touch LED suspend with out blinking */
-	led->blink_enable =0;
+		led->blink_enable = 0;
 /*  TODO : to wakeup from Touch LED suspend with out blinking */
 
-	bd2802_reset_cancel(led);
+		bd2802_reset_cancel(led);
 //HARDLINE	bd2802_on(led);
+	}
 
 	return 0;
 }
@@ -1249,8 +1322,10 @@ static struct i2c_driver bd2802_i2c_driver = {
 	},
 	.probe		= bd2802_probe,
 	.remove		= __exit_p(bd2802_remove),
+#ifndef CONFIG_HAS_EARLYSUSPEND /* 20110304 seven.kim@lge.com late_resume_lcd */
 	.suspend	= bd2802_suspend,
 	.resume		= bd2802_resume,
+#endif
 	.id_table	= bd2802_id,
 };
 

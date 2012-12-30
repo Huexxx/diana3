@@ -66,7 +66,7 @@
 EXPORT_SYMBOL(aat2870_i2c_client); //20101222 seven.kim@lge.com for touch ESD recovery
 
 //extern void bd2802_resume_for_lcd(); //2011205 kyungyoon.kim@lge.com lcd resume speed
-extern void bd2802_resume_for_lcd(void); //2011205 kyungyoon.kim@lge.com lcd resume speed, // 20120213 taeju.park@lge.com To delete compile warning, specifying 0 arguments
+//extern void bd2802_resume_for_lcd(void); //2011205 kyungyoon.kim@lge.com lcd resume speed, // 20120213 taeju.park@lge.com To delete compile warning, specifying 0 arguments
 
 
 extern unsigned int system_rev;
