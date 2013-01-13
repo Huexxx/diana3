@@ -1571,6 +1571,7 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 		return;
 
 	if (VM_SequentialReadHint(vma)) {
+		ra->ra_flags |= READAHEAD_MMAP;
 		page_cache_sync_readahead(mapping, ra, file, offset,
 					  ra->ra_pages);
 		return;
@@ -1589,10 +1590,12 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	ra_pages = min_t(unsigned long,
 			 ra->ra_pages,
 			 roundup_pow_of_two(totalram_pages / 1024));
+	ra->ra_flags |= READAHEAD_MMAP;
+	ra_set_pattern(ra, RA_PATTERN_MMAP_AROUND);
 	ra->start = max_t(long, 0, offset - ra_pages / 2);
 	ra->size = ra_pages;
 	ra->async_size = ra_pages / 4;
-	ra_submit(ra, mapping, file);
+	ra_submit(ra, mapping, file, offset, 1);
 }
 
 /*
@@ -1611,9 +1614,11 @@ static void do_async_mmap_readahead(struct vm_area_struct *vma,
 	if (VM_RandomReadHint(vma))
 		return;
 	ra_mmap_miss_dec(ra);
-	if (PageReadahead(page))
+	if (PageReadahead(page)) {
+		ra->ra_flags |= READAHEAD_MMAP;
 		page_cache_async_readahead(mapping, ra, file,
 					   page, offset, ra->ra_pages);
+	}
 }
 
 /**
