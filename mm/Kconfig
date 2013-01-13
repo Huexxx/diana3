@@ -302,6 +302,19 @@ config NOMMU_INITIAL_TRIM_EXCESS
 
 	  See Documentation/nommu-mmap.txt for more information.
 
+config READAHEAD_STATS
+	bool "Collect page-cache readahead stats"
+	depends on DEBUG_FS
+	default y
+	help
+	  Enable readahead events accounting. Usage:
+
+	  # mount -t debugfs none /debug
+
+	  # echo > /debug/readahead/stats  # reset counters
+	  # do benchmarks
+	  # cat /debug/readahead/stats     # check counters
+
 config TRANSPARENT_HUGEPAGE
 	bool "Transparent Hugepage Support"
 	depends on X86 && MMU
