@@ -1550,7 +1550,7 @@ static int page_cache_read(struct file *file, pgoff_t offset)
 	return ret;
 }
 
-#define MMAP_LOTSAMISS  (100)
+#define MMAP_LOTSAMISS  (10)
 
 /*
  * Synchronous readahead happens when we don't even find
