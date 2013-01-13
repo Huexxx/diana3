@@ -1578,11 +1578,17 @@ static void do_sync_mmap_readahead(struct vm_area_struct *vma,
 	}
 
 	/*
-	 * Do we miss much more than hit in this file? If so,
-	 * stop bothering with read-ahead. It will only hurt.
+	 * Do we miss much more than hit in this file? If so, stop bothering
+	 * with read-around, unless some nearby pages were accessed recently.
 	 */
-	if (ra_mmap_miss_inc(ra) > MMAP_LOTSAMISS)
-		return;
+	if (ra_mmap_miss_inc(ra) > MMAP_LOTSAMISS) {
+		struct radix_tree_node *node;
+		rcu_read_lock();
+		node = radix_tree_lookup_leaf_node(&mapping->page_tree, offset);
+		rcu_read_unlock();
+		if (!node)
+			return;
+	}
 
 	/*
 	 * mmap read-around
