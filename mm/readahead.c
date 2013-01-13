@@ -344,7 +344,10 @@ unsigned long max_sane_readahead(unsigned long nr)
  * Submit IO for the read-ahead request in file_ra_state.
  */
 unsigned long ra_submit(struct file_ra_state *ra,
-		       struct address_space *mapping, struct file *filp)
+			struct address_space *mapping,
+			struct file *filp,
+			pgoff_t offset,
+			unsigned long req_size)
 {
 	int actual;
 
@@ -478,6 +481,7 @@ ondemand_readahead(struct address_space *mapping,
 	 * start of file
 	 */
 	if (!offset) {
+		ra_set_pattern(ra, RA_PATTERN_INITIAL);
 		ra->start = offset;
 		ra->size = get_init_ra_size(req_size, max);
 		ra->async_size = ra->size > req_size ?
@@ -498,6 +502,7 @@ ondemand_readahead(struct address_space *mapping,
 	 */
 	if ((offset == (ra->start + ra->size - ra->async_size) ||
 	     offset == (ra->start + ra->size))) {
+		ra_set_pattern(ra, RA_PATTERN_SUBSEQUENT);
 		ra->start += ra->size;
 		ra->size = get_next_ra_size(ra, max);
 		ra->async_size = ra->size;
@@ -508,6 +513,7 @@ ondemand_readahead(struct address_space *mapping,
 	 * oversize read, no need to query page cache
 	 */
 	if (req_size > max && !hit_readahead_marker) {
+		ra_set_pattern(ra, RA_PATTERN_INITIAL);
 		ra->start = offset;
 		ra->size = max;
 		ra->async_size = max;
@@ -553,8 +559,10 @@ context_readahead:
 	 */
 	if (!tt && !hit_readahead_marker) {
 		if (!ra_thrashed(ra, offset)) {
+			ra_set_pattern(ra, RA_PATTERN_RANDOM);
 			ra->size = min(req_size, max);
 		} else {
+			ra_set_pattern(ra, RA_PATTERN_THRASH);
 			retain_inactive_pages(mapping, offset, min(2 * max,
 						ra->start + ra->size - offset));
 			ra->size = max_t(int, ra->size/2, MIN_READAHEAD_PAGES);
@@ -576,6 +584,7 @@ context_readahead:
 	if (tt <= start - offset)
 		return 0;
 
+	ra_set_pattern(ra, RA_PATTERN_CONTEXT);
 	ra->start = start;
 	ra->size = clamp_t(unsigned int, tt - (start - offset),
 			   MIN_READAHEAD_PAGES, max);
@@ -593,7 +602,7 @@ readit:
 		ra->size += ra->async_size;
 	}
 
-	return ra_submit(ra, mapping, filp);
+	return ra_submit(ra, mapping, filp, offset, req_size);
 }
 
 /**
