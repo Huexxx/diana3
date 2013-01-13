@@ -7,6 +7,28 @@
  *		Initial version.
  */
 
+/*
+ * Notes on readahead size.
+ *
+ * The default max readahead size is VM_MAX_READAHEAD=512k,
+ * which can be changed by user with boot time parameter "readahead="
+ * or runtime interface "/sys/devices/virtual/bdi/default/read_ahead_kb".
+ * The latter normally only takes effect in future for hot added devices.
+ *
+ * The effective max readahead size for each block device can be accessed with
+ * 1) the `blockdev` command
+ * 2) /sys/block/sda/queue/read_ahead_kb
+ * 3) /sys/devices/virtual/bdi/$(env stat -c '%t:%T' /dev/sda)/read_ahead_kb
+ *
+ * They are typically initialized with the global default size, however may be
+ * auto scaled down for small devices in add_disk(). NFS, software RAID, btrfs
+ * etc. have special rules to setup their default readahead size.
+ *
+ * The mmap read-around size typically equals with readahead size, with an
+ * extra limit proportional to system memory size.  For example, a 64MB box
+ * will have a 64KB read-around size limit, 128MB mem => 128KB limit, etc.
+ */
+
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/memcontrol.h>
