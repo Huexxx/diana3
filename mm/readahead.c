@@ -20,6 +20,28 @@
 #include <linux/pagevec.h>
 #include <linux/pagemap.h>
 
+static int __init config_readahead_size(char *str)
+{
+	unsigned long bytes;
+
+	if (!str)
+		return -EINVAL;
+	bytes = memparse(str, &str);
+	if (*str != '\0')
+		return -EINVAL;
+
+	if (bytes) {
+		if (bytes < PAGE_CACHE_SIZE)	/* missed 'k'/'m' suffixes? */
+			return -EINVAL;
+		if (bytes > 128 << 20)		/* limit to 128MB */
+			bytes = 128 << 20;
+	}
+
+	default_backing_dev_info.ra_pages = bytes / PAGE_CACHE_SIZE;
+	return 0;
+}
+early_param("readahead", config_readahead_size);
+
 /*
  * Initialise a struct file's readahead state.  Assumes that the caller has
  * memset *ra to zero.
