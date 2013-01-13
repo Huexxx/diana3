@@ -88,6 +88,189 @@ EXPORT_SYMBOL_GPL(file_ra_state_init);
 
 #define list_to_page(head) (list_entry((head)->prev, struct page, lru))
 
+#ifdef CONFIG_READAHEAD_STATS
+#include <linux/seq_file.h>
+#include <linux/debugfs.h>
+enum ra_account {
+	/* number of readaheads */
+	RA_ACCOUNT_COUNT,	/* readahead request */
+	RA_ACCOUNT_EOF,		/* readahead request contains/beyond EOF page */
+	RA_ACCOUNT_CHIT,	/* readahead request covers some cached pages */
+	RA_ACCOUNT_IOCOUNT,	/* readahead IO */
+	RA_ACCOUNT_SYNC,	/* readahead IO that is synchronous */
+	RA_ACCOUNT_MMAP,	/* readahead IO by mmap accesses */
+	/* number of readahead pages */
+	RA_ACCOUNT_SIZE,	/* readahead size */
+	RA_ACCOUNT_ASIZE,	/* readahead async size */
+	RA_ACCOUNT_ACTUAL,	/* readahead actual IO size */
+	/* end mark */
+	RA_ACCOUNT_MAX,
+};
+
+static unsigned long ra_stats[RA_PATTERN_MAX][RA_ACCOUNT_MAX];
+
+static void readahead_stats(struct address_space *mapping,
+			    pgoff_t offset,
+			    unsigned long req_size,
+			    unsigned int ra_flags,
+			    pgoff_t start,
+			    unsigned int size,
+			    unsigned int async_size,
+			    int actual)
+{
+	unsigned int pattern = ra_pattern(ra_flags);
+
+	ra_stats[pattern][RA_ACCOUNT_COUNT]++;
+	ra_stats[pattern][RA_ACCOUNT_SIZE] += size;
+	ra_stats[pattern][RA_ACCOUNT_ASIZE] += async_size;
+	ra_stats[pattern][RA_ACCOUNT_ACTUAL] += actual;
+
+	if (actual < size) {
+		if (start + size >
+		    (i_size_read(mapping->host) - 1) >> PAGE_CACHE_SHIFT)
+			ra_stats[pattern][RA_ACCOUNT_EOF]++;
+		else
+			ra_stats[pattern][RA_ACCOUNT_CHIT]++;
+	}
+
+	if (!actual)
+		return;
+
+	ra_stats[pattern][RA_ACCOUNT_IOCOUNT]++;
+
+	if (start <= offset && start + size > offset)
+		ra_stats[pattern][RA_ACCOUNT_SYNC]++;
+
+	if (ra_flags & READAHEAD_MMAP)
+		ra_stats[pattern][RA_ACCOUNT_MMAP]++;
+}
+
+static int readahead_stats_show(struct seq_file *s, void *_)
+{
+	static const char * const ra_pattern_names[] = {
+		[RA_PATTERN_INITIAL]		= "initial",
+		[RA_PATTERN_SUBSEQUENT]		= "subsequent",
+		[RA_PATTERN_CONTEXT]		= "context",
+		[RA_PATTERN_THRASH]		= "thrash",
+		[RA_PATTERN_MMAP_AROUND]	= "around",
+		[RA_PATTERN_FADVISE]		= "fadvise",
+		[RA_PATTERN_RANDOM]		= "random",
+		[RA_PATTERN_ALL]		= "all",
+	};
+	unsigned long count, iocount;
+	unsigned long i;
+
+	seq_printf(s, "%-10s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n",
+			"pattern",
+			"readahead", "eof_hit", "cache_hit",
+			"io", "sync_io", "mmap_io",
+			"size", "async_size", "io_size");
+
+	for (i = 0; i < RA_PATTERN_MAX; i++) {
+		count = ra_stats[i][RA_ACCOUNT_COUNT];
+		iocount = ra_stats[i][RA_ACCOUNT_IOCOUNT];
+		/*
+		 * avoid division-by-zero
+		 */
+		if (count == 0)
+			count = 1;
+		if (iocount == 0)
+			iocount = 1;
+
+		seq_printf(s, "%-10s %10lu %10lu %10lu %10lu %10lu %10lu "
+			   "%10lu %10lu %10lu\n",
+				ra_pattern_names[i],
+				ra_stats[i][RA_ACCOUNT_COUNT],
+				ra_stats[i][RA_ACCOUNT_EOF],
+				ra_stats[i][RA_ACCOUNT_CHIT],
+				ra_stats[i][RA_ACCOUNT_IOCOUNT],
+				ra_stats[i][RA_ACCOUNT_SYNC],
+				ra_stats[i][RA_ACCOUNT_MMAP],
+				ra_stats[i][RA_ACCOUNT_SIZE]   / count,
+				ra_stats[i][RA_ACCOUNT_ASIZE]  / count,
+				ra_stats[i][RA_ACCOUNT_ACTUAL] / iocount);
+	}
+
+	return 0;
+}
+
+static int readahead_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, readahead_stats_show, NULL);
+}
+
+static ssize_t readahead_stats_write(struct file *file, const char __user *buf,
+				     size_t size, loff_t *offset)
+{
+	memset(ra_stats, 0, sizeof(ra_stats));
+	return size;
+}
+
+static struct file_operations readahead_stats_fops = {
+	.owner		= THIS_MODULE,
+	.open		= readahead_stats_open,
+	.write		= readahead_stats_write,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct dentry *ra_debug_root;
+
+static int debugfs_create_readahead(void)
+{
+	struct dentry *debugfs_stats;
+
+	ra_debug_root = debugfs_create_dir("readahead", NULL);
+	if (!ra_debug_root)
+		goto out;
+
+	debugfs_stats = debugfs_create_file("stats", 0644, ra_debug_root,
+					    NULL, &readahead_stats_fops);
+	if (!debugfs_stats)
+		goto out;
+
+	return 0;
+out:
+	printk(KERN_ERR "readahead: failed to create debugfs entries\n");
+	return -ENOMEM;
+}
+
+static int __init readahead_init(void)
+{
+	debugfs_create_readahead();
+	return 0;
+}
+
+static void __exit readahead_exit(void)
+{
+	debugfs_remove_recursive(ra_debug_root);
+}
+
+module_init(readahead_init);
+module_exit(readahead_exit);
+#endif
+
+static void readahead_event(struct address_space *mapping,
+			    pgoff_t offset,
+			    unsigned long req_size,
+			    unsigned int ra_flags,
+			    pgoff_t start,
+			    unsigned int size,
+			    unsigned int async_size,
+			    unsigned int actual)
+{
+#ifdef CONFIG_READAHEAD_STATS
+	readahead_stats(mapping, offset, req_size, ra_flags,
+			start, size, async_size, actual);
+	readahead_stats(mapping, offset, req_size,
+			RA_PATTERN_ALL << READAHEAD_PATTERN_SHIFT,
+			start, size, async_size, actual);
+#endif
+	trace_readahead(mapping, offset, req_size, ra_flags,
+			start, size, async_size, actual);
+}
+
 /*
  * see if a page needs releasing upon read_cache_pages() failure
  * - the caller of read_cache_pages() may have set PG_private or PG_fscache
@@ -331,7 +514,7 @@ int force_page_cache_readahead(struct address_space *mapping, struct file *filp,
 		nr_to_read -= this_chunk;
 	}
 
-	trace_readahead(mapping, offset, nr_to_read,
+	readahead_event(mapping, offset, nr_to_read,
 			RA_PATTERN_FADVISE << READAHEAD_PATTERN_SHIFT,
 			offset, nr_to_read, 0, ret);
 
@@ -362,7 +545,7 @@ unsigned long ra_submit(struct file_ra_state *ra,
 	actual = __do_page_cache_readahead(mapping, filp,
 					ra->start, ra->size, ra->async_size);
 
-	trace_readahead(mapping, offset, req_size, ra->ra_flags,
+	readahead_event(mapping, offset, req_size, ra->ra_flags,
 			ra->start, ra->size, ra->async_size, actual);
 
 	return actual;
