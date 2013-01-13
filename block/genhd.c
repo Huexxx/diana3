@@ -579,6 +579,7 @@ void add_disk(struct gendisk *disk)
 	struct backing_dev_info *bdi;
 	dev_t devt;
 	int retval;
+	unsigned long size;
 
 	/* minors == 0 indicates to use ext devt from part0 and should
 	 * be accompanied with EXT_DEVT flag.  Make sure all
@@ -614,6 +615,29 @@ void add_disk(struct gendisk *disk)
 	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,
 				   "bdi");
 	WARN_ON(retval);
+
+	/*
+	 * Limit default readahead size for small devices.
+	 *        disk size    readahead size
+	 *               1M                8k
+	 *               4M               16k
+	 *              16M               32k
+	 *              64M               64k
+	 *             256M              128k
+	 *               1G              256k
+	 *        ---------------------------
+	 *               4G              512k
+	 *              16G             1024k
+	 *              64G             2048k
+	 *             256G             4096k
+	 * Since the default readahead size is 512k, this limit
+	 * only takes effect for devices whose size is less than 4G.
+	 */
+	if (get_capacity(disk)) {
+		size = get_capacity(disk) >> 9;
+		size = 1UL << (ilog2(size) / 2);
+		bdi->ra_pages = min(bdi->ra_pages, size);
+	}
 
 	disk_add_events(disk);
 }
