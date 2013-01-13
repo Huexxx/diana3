@@ -369,19 +369,20 @@ EXPORT_SYMBOL(radix_tree_insert);
  * is_slot == 0 : search for the node.
  */
 static void *radix_tree_lookup_element(struct radix_tree_root *root,
-				unsigned long index, int is_slot)
+				unsigned long index, int is_slot, int level)
 {
 	unsigned int height, shift;
-	struct radix_tree_node *node, **slot;
+	struct radix_tree_node *node;
+	struct radix_tree_node **slot = &root->rnode;
 
 	node = rcu_dereference_raw(root->rnode);
 	if (node == NULL)
 		return NULL;
 
 	if (!radix_tree_is_indirect_ptr(node)) {
-		if (index > 0)
+		if (index > 0 || level > 0)
 			return NULL;
-		return is_slot ? (void *)&root->rnode : node;
+		goto out;
 	}
 	node = indirect_to_ptr(node);
 
@@ -391,7 +392,7 @@ static void *radix_tree_lookup_element(struct radix_tree_root *root,
 
 	shift = (height-1) * RADIX_TREE_MAP_SHIFT;
 
-	do {
+	while (height > level) {
 		slot = (struct radix_tree_node **)
 			(node->slots + ((index>>shift) & RADIX_TREE_MAP_MASK));
 		node = rcu_dereference_raw(*slot);
@@ -400,8 +401,9 @@ static void *radix_tree_lookup_element(struct radix_tree_root *root,
 
 		shift -= RADIX_TREE_MAP_SHIFT;
 		height--;
-	} while (height > 0);
+	}
 
+out:
 	return is_slot ? (void *)slot : indirect_to_ptr(node);
 }
 
@@ -420,7 +422,7 @@ static void *radix_tree_lookup_element(struct radix_tree_root *root,
  */
 void **radix_tree_lookup_slot(struct radix_tree_root *root, unsigned long index)
 {
-	return (void **)radix_tree_lookup_element(root, index, 1);
+	return (void **)radix_tree_lookup_element(root, index, 1, 0);
 }
 EXPORT_SYMBOL(radix_tree_lookup_slot);
 
@@ -438,9 +440,26 @@ EXPORT_SYMBOL(radix_tree_lookup_slot);
  */
 void *radix_tree_lookup(struct radix_tree_root *root, unsigned long index)
 {
-	return radix_tree_lookup_element(root, index, 0);
+	return radix_tree_lookup_element(root, index, 0, 0);
 }
 EXPORT_SYMBOL(radix_tree_lookup);
+
+/**
+ *	radix_tree_lookup_leaf_node    -    lookup leaf node on a radix tree
+ *	@root:		radix tree root
+ *	@index:		index key
+ *
+ *	Lookup the leaf node that covers @index in the radix tree @root.
+ *	Return NULL if the node does not exist, or is the special root node.
+ *
+ *	The typical usage is to check the value of node->count, which shall be
+ *	performed inside rcu_read_lock to prevent the node from being freed.
+ */
+struct radix_tree_node *
+radix_tree_lookup_leaf_node(struct radix_tree_root *root, unsigned long index)
+{
+	return radix_tree_lookup_element(root, index, 0, 1);
+}
 
 /**
  *	radix_tree_tag_set - set a tag on a radix tree node
