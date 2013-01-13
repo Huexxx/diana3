@@ -924,6 +924,7 @@ struct file_ra_state {
 
 /* ra_flags bits */
 #define	READAHEAD_MMAP_MISS	0x00000fff /* cache misses for mmap access */
+#define READAHEAD_THRASHED	0x10000000
 
 /*
  * Don't do ra_flags++ directly to avoid possible overflow:
