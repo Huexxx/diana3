@@ -82,7 +82,7 @@ IMG_BOOL SGX_ISRHandler(IMG_VOID *pvData);
 int pvr_k_lock_up_cnt = 0;
 u32 l = 0x00000000;
 extern char reset_mode;
-#define PVR_K_MAX_COUNT 1
+#define PVR_K_MAX_COUNT 10
 // LGE_MOD_E 20121119 subum.choi@lge.com PVR_K hidden reset
 
 static
@@ -1232,6 +1232,13 @@ IMG_VOID HWRecoveryResetSGX (PVRSRV_DEVICE_NODE *psDeviceNode,
 	
 	
 	PVRSRVProcessQueues(IMG_TRUE);
+	// LGE_MOD_S 20121126 subum.choi@lge.com PVR_K hidden reset (count reset)
+        if(eError == PVRSRV_OK)
+	{
+                pvr_k_lock_up_cnt = 0;                  
+		printk("\n[%s] PVRSRV Status OK :: lock_up count reset(%d) !!\n", __func__, pvr_k_lock_up_cnt);
+	}
+        // LGE_MOD_E 20121126 subum.choi@lge.com PVR_K hidden reset (count reset)
 }
 #endif 
 
