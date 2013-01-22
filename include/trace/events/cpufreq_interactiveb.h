@@ -1,8 +1,8 @@
 #undef TRACE_SYSTEM
-#define TRACE_SYSTEM cpufreq_interactive2
+#define TRACE_SYSTEM cpufreq_interactiveb
 
-#if !defined(_TRACE_CPUFREQ_INTERACTIVE2_H) || defined(TRACE_HEADER_MULTI_READ)
-#define _TRACE_CPUFREQ_INTERACTIVE2_H
+#if !defined(_TRACE_CPUFREQ_INTERACTIVEB_H) || defined(TRACE_HEADER_MULTI_READ)
+#define _TRACE_CPUFREQ_INTERACTIVEB_H
 
 #include <linux/tracepoint.h>
 
@@ -28,13 +28,7 @@ DECLARE_EVENT_CLASS(set,
 	      __entry->actualfreq)
 );
 
-DEFINE_EVENT(set, cpufreq_interactive2_up,
-	TP_PROTO(u32 cpu_id, unsigned long targfreq,
-	     unsigned long actualfreq),
-	TP_ARGS(cpu_id, targfreq, actualfreq)
-);
-
-DEFINE_EVENT(set, cpufreq_interactive2_down,
+DEFINE_EVENT(set, cpufreq_interactiveb_setspeed,
 	TP_PROTO(u32 cpu_id, unsigned long targfreq,
 	     unsigned long actualfreq),
 	TP_ARGS(cpu_id, targfreq, actualfreq)
@@ -42,47 +36,53 @@ DEFINE_EVENT(set, cpufreq_interactive2_down,
 
 DECLARE_EVENT_CLASS(loadeval,
 	    TP_PROTO(unsigned long cpu_id, unsigned long load,
-		     unsigned long curfreq, unsigned long targfreq),
-	    TP_ARGS(cpu_id, load, curfreq, targfreq),
+		     unsigned long curtarg, unsigned long curactual,
+		     unsigned long newtarg),
+		    TP_ARGS(cpu_id, load, curtarg, curactual, newtarg),
 
 	    TP_STRUCT__entry(
 		    __field(unsigned long, cpu_id    )
 		    __field(unsigned long, load      )
-		    __field(unsigned long, curfreq   )
-		    __field(unsigned long, targfreq  )
+		    __field(unsigned long, curtarg   )
+		    __field(unsigned long, curactual )
+		    __field(unsigned long, newtarg   )
 	    ),
 
 	    TP_fast_assign(
 		    __entry->cpu_id = cpu_id;
 		    __entry->load = load;
-		    __entry->curfreq = curfreq;
-		    __entry->targfreq = targfreq;
+		    __entry->curtarg = curtarg;
+		    __entry->curactual = curactual;
+		    __entry->newtarg = newtarg;
 	    ),
 
-	    TP_printk("cpu=%lu load=%lu cur=%lu targ=%lu",
-		      __entry->cpu_id, __entry->load, __entry->curfreq,
-		      __entry->targfreq)
+	    TP_printk("cpu=%lu load=%lu cur=%lu actual=%lu targ=%lu",
+		      __entry->cpu_id, __entry->load, __entry->curtarg,
+		      __entry->curactual, __entry->newtarg)
 );
 
-DEFINE_EVENT(loadeval, cpufreq_interactive2_target,
+DEFINE_EVENT(loadeval, cpufreq_interactiveb_target,
 	    TP_PROTO(unsigned long cpu_id, unsigned long load,
-		     unsigned long curfreq, unsigned long targfreq),
-	    TP_ARGS(cpu_id, load, curfreq, targfreq)
+		     unsigned long curtarg, unsigned long curactual,
+		     unsigned long newtarg),
+	    TP_ARGS(cpu_id, load, curtarg, curactual, newtarg)
 );
 
-DEFINE_EVENT(loadeval, cpufreq_interactive2_already,
+DEFINE_EVENT(loadeval, cpufreq_interactiveb_already,
 	    TP_PROTO(unsigned long cpu_id, unsigned long load,
-		     unsigned long curfreq, unsigned long targfreq),
-	    TP_ARGS(cpu_id, load, curfreq, targfreq)
+		     unsigned long curtarg, unsigned long curactual,
+		     unsigned long newtarg),
+	    TP_ARGS(cpu_id, load, curtarg, curactual, newtarg)
 );
 
-DEFINE_EVENT(loadeval, cpufreq_interactive2_notyet,
+DEFINE_EVENT(loadeval, cpufreq_interactiveb_notyet,
 	    TP_PROTO(unsigned long cpu_id, unsigned long load,
-		     unsigned long curfreq, unsigned long targfreq),
-	    TP_ARGS(cpu_id, load, curfreq, targfreq)
+		     unsigned long curtarg, unsigned long curactual,
+		     unsigned long newtarg),
+	    TP_ARGS(cpu_id, load, curtarg, curactual, newtarg)
 );
 
-TRACE_EVENT(cpufreq_interactive2_boost,
+TRACE_EVENT(cpufreq_interactiveb_boost,
 	    TP_PROTO(const char *s),
 	    TP_ARGS(s),
 	    TP_STRUCT__entry(
@@ -94,7 +94,7 @@ TRACE_EVENT(cpufreq_interactive2_boost,
 	    TP_printk("%s", __get_str(s))
 );
 
-TRACE_EVENT(cpufreq_interactive2_unboost,
+TRACE_EVENT(cpufreq_interactiveb_unboost,
 	    TP_PROTO(const char *s),
 	    TP_ARGS(s),
 	    TP_STRUCT__entry(
@@ -106,7 +106,7 @@ TRACE_EVENT(cpufreq_interactive2_unboost,
 	    TP_printk("%s", __get_str(s))
 );
 
-#endif /* _TRACE_CPUFREQ_INTERACTIVE2_H */
+#endif /* _TRACE_CPUFREQ_INTERACTIVEB_H */
 
 /* This part must be outside protection */
 #include <trace/define_trace.h>
