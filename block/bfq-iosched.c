@@ -141,8 +141,8 @@ static DEFINE_IDA(cic_index_ida);
 				{ RB_ROOT, RB_ROOT, NULL, NULL, 0, 0 })
 
 #define RQ_CIC(rq)		\
-	((struct cfq_io_context *) (rq)->elevator_private[0])
-#define RQ_BFQQ(rq)		((rq)->elevator_private[1])
+	((struct cfq_io_context *) (rq)->elv.priv[0])
+#define RQ_BFQQ(rq)		((rq)->elv.priv[1])
 
 static inline void bfq_schedule_dispatch(struct bfq_data *bfqd);
 
@@ -2382,8 +2382,8 @@ static void bfq_put_request(struct request *rq)
 
 		put_io_context(RQ_CIC(rq)->ioc);
 
-		rq->elevator_private[0] = NULL;
-		rq->elevator_private[1] = NULL;
+		rq->elv.priv[0] = NULL;
+		rq->elv.priv[1] = NULL;
 
 		bfq_log_bfqq(bfqq->bfqd, bfqq, "put_request %p, %d",
 			     bfqq, atomic_read(&bfqq->ref));
@@ -2485,8 +2485,8 @@ new_queue:
 
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
-	rq->elevator_private[0] = cic;
-	rq->elevator_private[1] = bfqq;
+	rq->elv.priv[0] = cic;
+	rq->elv.priv[1] = bfqq;
 
 	return 0;
 
