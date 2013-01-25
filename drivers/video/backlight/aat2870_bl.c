@@ -757,11 +757,17 @@ static void aat2870_set_main_current_level(struct i2c_client *client, int level)
 
 	// LGE_B_DOM_S 2011218 kyungrae.jo@lge.com, use max current
 	//max 25.2mA, min 1.8mA
-	if(level > 30)
+/*	if(level > 30)
 		val = (unsigned char)(level * 28 / 255);
 	else
-		val = (unsigned char)(level * 2 / 30);
+		val = (unsigned char)(level * 2 / 30);*/
 	// LGE_B_DOM_E 2011218 kyungrae.jo@lge.com, use max current
+
+	// Huexxx: linear with two slopes, max 24.3mA
+	if(level > 85)
+	        val = (unsigned char)((level * 33 / 255)-6);
+        else
+                val = (unsigned char)(level * 15 / 255);
 	
 	val = 0xE0 | val;
 
