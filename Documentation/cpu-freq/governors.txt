@@ -30,7 +30,7 @@ Contents:
 2.5  Conservative
 2.6  Interactive
 2.7  Hotplug
-2.8  SmartassV2
+2.8  LionHeart
 
 3.   The Governor Interface in the CPUfreq Core
 
@@ -253,78 +253,6 @@ boostpulse: Immediately boost speed of all CPUs to hispeed_freq for
 min_sample_time, after which speeds are allowed to drop below
 hispeed_freq according to load as usual.
 
-2.6.1 Interactiveb
----------------
-
-The CPUfreq governor "interactiveb" is designed for latency-sensitive,
-interactive workloads. This governor sets the CPU speed depending on
-usage, similar to "ondemand" and "conservative" governors, but with a
-different set of configurable behaviors.
-
-The tuneable values for this governor are:
-
-target_loads: CPU load values used to adjust speed to influence the
-current CPU load toward that value.  In general, the lower the target
-load, the more often the governor will raise CPU speeds to bring load
-below the target.  The format is a single target load, optionally
-followed by pairs of CPU speeds and CPU loads to target at or above
-those speeds.  Colons can be used between the speeds and associated
-target loads for readability.  For example:
-
-   85 800000:90 1000000:99
-
-targets CPU load 85% below speed 800MHz, 90% at or above 800MHz, until
-1GHz and above, at which load 99% is targeted.  If speeds are
-specified these must appear in ascending order.  Higher target load
-values are typically specified for higher speeds, that is, target load
-values also usually appear in an ascending order. The default is
-target load 90% for all speeds.
-
-min_sample_time: The minimum amount of time to spend at the current
-frequency before ramping down. Default is 80000 uS.
-
-hispeed_freq: An intermediate "hi speed" at which to initially ramp
-when CPU load hits the value specified in go_hispeed_load.  If load
-stays high for the amount of time specified in above_hispeed_delay,
-then speed may be bumped higher.  Default is the maximum speed
-allowed by the policy at governor initialization time.
-
-go_hispeed_load: The CPU load at which to ramp to hispeed_freq.
-Default is 99%.
-
-above_hispeed_delay: When speed is at or above hispeed_freq, wait for
-this long before raising speed in response to continued high load.
-Default is 20000 uS.
-
-timer_rate: Sample rate for reevaluating CPU load when the CPU is not
-idle.  A deferrable timer is used, such that the CPU will not be woken
-from idle to service this timer until something else needs to run.
-(The maximum time to allow deferring this timer when not running at
-minimum speed is configurable via timer_slack.)  Default is 20000 uS.
-
-timer_slack: Maximum additional time to defer handling the governor
-sampling timer beyond timer_rate when running at speeds above the
-minimum.  For platforms that consume additional power at idle when
-CPUs are running at speeds greater than minimum, this places an upper
-bound on how long the timer will be deferred prior to re-evaluating
-load and dropping speed.  For example, if timer_rate is 20000uS and
-timer_slack is 10000uS then timers will be deferred for up to 30msec
-when not at lowest speed.  A value of -1 means defer timers
-indefinitely at all speeds.  Default is 80000 uS.
-
-boost: If non-zero, immediately boost speed of all CPUs to at least
-hispeed_freq until zero is written to this attribute.  If zero, allow
-CPU speeds to drop below hispeed_freq according to load as usual.
-Default is zero.
-
-boostpulse: On each write, immediately boost speed of all CPUs to
-hispeed_freq for at least the period of time specified by
-boostpulse_duration, after which speeds are allowed to drop below
-hispeed_freq according to load as usual.
-
-boostpulse_duration: Length of time to hold CPU speed at hispeed_freq
-on a write to boostpulse, before allowing speed to drop according to
-load as usual.  Default is 80000 uS.
 
 2.7 Hotplug
 -----------
@@ -353,37 +281,17 @@ The number of sampling periods averaged together is tunable via the
 "hotplug_in_sampling_periods" and "hotplug_out_sampling_periods"
 run-time tunable parameters.
 
-2.8 SmartassV2
----------------
 
-The CPUfreq governor "smartassV2", like other governors, aims to balance
-performance vs battery life by using low frequencies when load is low and
-ramping the frequency when necessary, fast enough to ensure responsiveness.
+2.8 LionHeart
+-----------
 
-The implementation of the governor is roughtly based on the idea of interactive.
-The idle loop is used to track when the CPU has idle cycles. The idle loop will
-set a relatively high rate timer to sample the load when appropriate, the timer
-will measure the load since it was set and schedule a work queue task to do the
-actual frequency change when necessary.
+Lionheart is a conservative-based governor which is based on samsung's
+update3 source. The tunables (such as the thresholds and sampling rate)
+were changed so the governor behaves more like the performance one, at
+the cost of battery as the scaling is very aggressive. When it comes to
+smoothness (not considering battery drain), a tuned conservative delivers
+more as compared to a tuned ondemand.
 
-The most important tunable is the "ideal" frequency: this governor will aim
-for this frequency, in the sense that it will ramp towards this frequency much
-more aggresively than beyond it - both when ramping up from below this frequency
-and when ramping down from above this frequency. Still, note, that when load is
-low enough the governor should choose the lowest available frequency regardless
-of the ideal frequency and similarly when load is consistently high enough the
-highest available frequency will be used.
-
-Smartass also tracks the state of the screen, and when screen is off (a.k.a
-sleep or suspended in the terms of this governor) a different ideal frequency
-is used. This is the only difference between the screen on and screen off
-states. Proper tuning of the awake_ideal_freq and sleep_ideal_freq should
-allow both high responsiveness when screen is on and utilizing the low
-frequency range when load is low, especially when screen is off.
-
-Finally, smartass is a highly customizable governor with almost everything
-tweakable through the sysfs. For a detailed explaination of each tunable,
-please see the inline comments at the begging of the code (smartass2.c).
 
 3. The Governor Interface in the CPUfreq Core
 =============================================
