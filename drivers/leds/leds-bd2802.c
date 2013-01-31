@@ -548,7 +548,10 @@ static void bd2802_touchkey_work_func(struct work_struct *work)
 	bd2802_turn_white(led,led->key_led);
 	bd2802_turn_blue(led,HIDDEN1);
 	bd2802_turn_blue(led,HIDDEN2);
-	hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
+	if (led_timer > 4000)
+		hrtimer_start(&led->ledmin_timer, ktime_set(led_timer/1000, 0), HRTIMER_MODE_REL);
+	else
+		hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
 }
 
 static enum hrtimer_restart bd2802_touchkey_timer_func(struct hrtimer *timer)
@@ -705,15 +708,15 @@ static ssize_t bd2802_store_led_start(struct device *dev,
 	else if (value==0)
 	{
 #if defined(BLINK_ON_BOOTING)
-		led->led_state=BD2802_ON;
-		led->white_current = max_current;
-		led->blue_current = BD2802_CURRENT_000;
+		led->led_state = BD2802_DIMMING; // Huexxx: enable dimmed...
+		led->white_current = min_current; // Huexxx: enable dimmed...
+	    	led->blue_current = BD2802_CURRENT_000;
 		led->blink_enable=0;
 		bd2802_sw_reset(led);
 		bd2802_reset_cancel(led);
 		bd2802_on(led);
 		bd2802_enable(led);
-		hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL); //+DEJA
+//		hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL); //+DEJA
 #else 
 		led->led_state=BD2802_SEQ_END;
 		led->blue_current = BD2802_CURRENT_000;
@@ -863,11 +866,11 @@ static ssize_t bd2802_store_led_sync(struct device *dev,
 		}
 	} else if(value == 0) {
 		if(led->led_state == BD2802_SYNC) {
-			led->white_current = max_current;
-			led->blue_current = BD2802_CURRENT_000;
+			led->white_current = min_current; // Huexxx: enable dimmed...
+	    		led->blue_current = BD2802_CURRENT_000;
 			bd2802_on(led);
-			led->led_state = BD2802_ON;
-			hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
+			led->led_state = BD2802_DIMMING; // Huexxx: enable dimmed...
+//			hrtimer_start(&led->ledmin_timer, ktime_set(0, led_timer*1000000), HRTIMER_MODE_REL);
 		}
 	} else {
 		return -EINVAL;
