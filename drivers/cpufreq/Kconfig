@@ -109,7 +109,6 @@ config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	  loading your cpufreq low-level hardware driver, using the
 	  'interactive' governor for latency-sensitive workloads.
 
-
 config CPU_FREQ_DEFAULT_GOV_HOTPLUG
 	bool "hotplug"
 	select CPU_FREQ_GOV_HOTPLUG
@@ -129,6 +128,19 @@ config CPU_FREQ_DEFAULT_GOV_SMARTASS2
 	select CPU_FREQ_GOV_PERFORMANCE
 	help
 	  Use the CPUFreq governor 'Smartass2' as default.
+
+config CPU_FREQ_DEFAULT_GOV_LIONHEART
+	bool "lionheart"
+	select CPU_FREQ_GOV_LIONHEART
+	help
+	  Lionheart is a conservative-based governor which is based on
+	  samsung's update3 source. The tunables (such as the thresholds
+	  and sampling rate) were changed so the governor behaves more
+	  like the performance one, at the cost of battery as the scaling
+	  is very aggressive. When it comes to smoothness (not considering
+	  battery drain), a tuned conservative delivers more as compared to
+	  a tuned ondemand.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -256,6 +268,12 @@ config CPU_FREQ_GOV_SMARTASS2
 	depends on CPU_FREQ
 	help
 	  'Smartass2' - a "slightly more agressive smartass" governor!
+
+config CPU_FREQ_GOV_LIONHEART
+	tristate "'lionheart' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	  'LionHeart' - a more aggressive conservative governor approach.
 
 	  If in doubt, say N.
 
