@@ -52,8 +52,6 @@
 int omap2_pm_debug;
 u32 enable_off_mode;
 u32 sleep_while_idle;
-u32 wakeup_timer_seconds;
-u32 wakeup_timer_milliseconds;
 // LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 u32 voltage_off_while_idle;
 // LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04

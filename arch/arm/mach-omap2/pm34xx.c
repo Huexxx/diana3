@@ -57,6 +57,9 @@
 #include "sdrc.h"
 #include "control.h"
 
+u32 wakeup_timer_seconds;
+u32 wakeup_timer_milliseconds;
+
 #ifdef CONFIG_SUSPEND
 static suspend_state_t suspend_state = PM_SUSPEND_ON;
 static inline bool is_suspending(void)
@@ -680,10 +683,12 @@ static int omap3_pm_suspend(void)
 					 wakeup_timer_milliseconds);
 #else
 	if (wakeup_timer_seconds || wakeup_timer_milliseconds) {
+#ifdef CONFIG_PM_DEBUG
 		printk(KERN_DEBUG "wakeup_timer_seconds = %d\n"
 				"wakeup_timer_milliseconds = %d\n",
 				wakeup_timer_seconds, 
 				wakeup_timer_milliseconds);
+#endif
 		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
 					 wakeup_timer_milliseconds);
 	}

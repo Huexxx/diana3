@@ -59,6 +59,9 @@
 #include "vc.h"
 #include "control.h"
 
+u32 wakeup_timer_seconds;
+u32 wakeup_timer_milliseconds;
+
 struct power_state {
 	struct powerdomain *pwrdm;
 	u32 next_state;
